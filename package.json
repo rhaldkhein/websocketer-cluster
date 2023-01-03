@@ -43,7 +43,7 @@
   "dependencies": {
     "nanoid": "^4.0.0",
     "reconnecting-websocket": "^4.4.0",
-    "websocketer": "^1.2.0",
+    "websocketer": "^1.2.1",
     "ws": "^8.8.1"
   },
   "devDependencies": {
