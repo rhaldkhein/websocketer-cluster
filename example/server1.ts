@@ -1,6 +1,6 @@
 import { WebSocketer } from 'websocketer'
 import { WebSocketServer } from 'ws'
-import WebSocketerCluster from '../src/WebSocketerCluster'
+import { WebSocketerCluster } from '../src'
 
 function start() {
   const wss = new WebSocketServer({
@@ -12,9 +12,9 @@ function start() {
   wss.on('connection', ws => {
     console.log('connection')
     const socketer = new WebSocketer(ws, { cluster, id: 'server1', debug: true })
-    socketer.on('hey', () => {
-      throw new Error('Something went wrong!')
-      // return 'from server1'
+    socketer.on('hey', (data) => {
+      // throw new Error('Something went wrong!')
+      return 'from server ' + data
     })
     ws.on('close', () => {
       console.log('close')

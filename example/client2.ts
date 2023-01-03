@@ -10,7 +10,7 @@ function start() {
   )
   const socketer = new WebSocketer(ws, { id: 'client2', debug: true })
   socketer.on('hello', async (data) => {
-    const res = await socketer.send('hey', 'yoo', 'server1')
+    const res = await socketer.send('hey', data, 'server1')
     return res
   })
   ws.addEventListener('open', () => {

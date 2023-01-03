@@ -1,6 +1,7 @@
+import { nanoid } from 'nanoid'
 import { WebSocket } from 'ws'
 import ReconnectingWebSocket, { UrlProvider } from 'reconnecting-websocket'
-import { RequestData, WebSocketer, Cluster } from 'websocketer'
+import { RequestData, WebSocketer, Cluster, WebSocketerError } from 'websocketer'
 
 export interface ClusterOptions {
   origin: UrlProvider
@@ -23,14 +24,26 @@ export default class WebSocketerCluster implements Cluster {
         {
           WebSocket
         }
-      )
+      ),
+      {
+        id: '_wsrc:c:' + nanoid()
+      }
     )
     this._handleSocketerEvents()
+  }
+
+  get socketer() {
+    return this._socketer
+  }
+
+  get socketers() {
+    return this._socketers
   }
 
   destroy() {
     this._socketer.socket.close()
     this._socketer.destroy()
+    this._socketers.clear()
   }
 
   register(
@@ -45,12 +58,26 @@ export default class WebSocketerCluster implements Cluster {
     this._socketers.delete(socketer)
   }
 
-  async send<T>(
-    request: RequestData) {
-
-    request.socket = undefined
-    request.locals = undefined
-    return this._socketer.send<T>('_forward_', request)
+  async handleRequest<T>(
+    request: RequestData<any>) {
+    try {
+      if (this._socketer.socket.readyState !== 1) {
+        throw new WebSocketerError(
+          'Cluster server disconnected',
+          'ERR_WSR_NO_CLUSTER_SERVER'
+        )
+      }
+      return await this._socketer.send<T>('_forward_', request)
+    } catch (error: any) {
+      return this._socketer.endRequestData(request, {
+        error: {
+          name: error.name,
+          code: error.code || 'ERR_WSR_INTERNAL_CLUSTER',
+          message: error.message,
+          payload: error.payload
+        }
+      })
+    }
   }
 
   private _handleSocketerEvents() {

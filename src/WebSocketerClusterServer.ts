@@ -1,3 +1,4 @@
+import { nanoid } from 'nanoid'
 import { RequestData, WebSocketer, WebSocketerError } from 'websocketer'
 import { WebSocketServer, ServerOptions, WebSocket } from 'ws'
 
@@ -18,8 +19,13 @@ export default class WebSocketerClusterServer {
   }
 
   destroy() {
-    this._wss.removeAllListeners()
-    this._wss.close()
+    this._clients.forEach(c => c.destroy())
+    this._clients = []
+    this._wss.close(() => {
+      this._wss.removeAllListeners()
+      // @ts-ignore
+      this._wss = undefined
+    })
   }
 
   async broadcast(
@@ -37,8 +43,8 @@ export default class WebSocketerClusterServer {
     const result = results.find(v => v !== undefined)
     if (!result) {
       throw new WebSocketerError(
-        'No listener',
-        'ERR_WSR_NO_LISTENER'
+        'No cluster route',
+        'ERR_WSR_NO_CLUSTER_ROUTE'
       )
     }
     return result
@@ -49,7 +55,12 @@ export default class WebSocketerClusterServer {
     this._wss.on(
       'connection',
       (socket) => {
-        const socketer = new WebSocketer(socket)
+        const socketer = new WebSocketer(
+          socket,
+          {
+            id: '_wsrc:s:' + nanoid()
+          }
+        )
         // add socketer to set
         const clientSet = new Set(this._clients)
         clientSet.add(socketer)

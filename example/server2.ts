@@ -1,6 +1,6 @@
 import { WebSocketer } from 'websocketer'
 import { WebSocketServer } from 'ws'
-import WebSocketerCluster from '../src/WebSocketerCluster'
+import { WebSocketerCluster } from '../src'
 
 function start() {
   const wss = new WebSocketServer({
