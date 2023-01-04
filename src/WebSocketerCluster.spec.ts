@@ -167,6 +167,12 @@ describe('index', () => {
       return 'hi11'
     })
 
+    wsrClient20?.on('bar', fnBar)
+    wsrClient20?.on('foo', data => {
+      expect(data).toBe('foo20')
+      return 'hi20'
+    })
+
     const plFoo = await wsrClient20?.send('foo', 'foo11', 'client11')
     const plBar = await wsrClient20?.send('bar', 'barbar', 'client10')
     expect(plFoo).toBe('hi11')

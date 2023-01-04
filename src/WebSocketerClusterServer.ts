@@ -62,17 +62,13 @@ export default class WebSocketerClusterServer {
           }
         )
         // add socketer to set
-        const clientSet = new Set(this._clients)
-        clientSet.add(socketer)
-        this._clients = Array.from(clientSet)
+        this._clients.push(socketer)
         // handle socket close and cleanup
         socket.on(
           'close',
           () => {
             socketer.destroy()
-            const clientSet = new Set(this._clients)
-            clientSet.delete(socketer)
-            this._clients = Array.from(clientSet)
+            this._clients.splice(this._clients.indexOf(socketer), 1)
           }
         )
         // handle socketer events
