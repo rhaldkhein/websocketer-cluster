@@ -1,10 +1,10 @@
 import { nanoid } from 'nanoid'
 import { WebSocket } from 'ws'
-import ReconnectingWebSocket, { UrlProvider } from 'reconnecting-websocket'
+import ReconnectingWebSocket from 'reconnecting-websocket'
 import { RequestData, WebSocketer, Cluster, WebSocketerError } from 'websocketer'
 
 export interface ClusterOptions {
-  origin: UrlProvider
+  origin: string
 }
 
 export default class WebSocketerCluster implements Cluster {
@@ -17,9 +17,11 @@ export default class WebSocketerCluster implements Cluster {
   constructor(
     options: ClusterOptions) {
 
+    const url = new URL(options.origin)
+    url.searchParams.set('websocketer', '1')
     this._socketer = new WebSocketer(
       new ReconnectingWebSocket(
-        options.origin,
+        url.toString(),
         undefined,
         {
           WebSocket

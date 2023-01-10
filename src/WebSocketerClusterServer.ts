@@ -54,7 +54,13 @@ export default class WebSocketerClusterServer {
 
     this._wss.on(
       'connection',
-      (socket) => {
+      (socket, req) => {
+        // check if it's a websocketer connection
+        const query = new URLSearchParams(req.url?.substring(1))
+        const isWebsocketer = query.get('websocketer') === '1'
+        // ignore if not
+        if (!isWebsocketer) return
+        // create websocketer instance
         const socketer = new WebSocketer(
           socket,
           {
