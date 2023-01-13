@@ -14,6 +14,7 @@ const rxSpace = / /ig
 
 export interface RedisClusterClientOptions {
   host: string
+  client: any
   id: string
   timeout: number
 }
@@ -47,7 +48,7 @@ export default class RedisClusterClient extends EventEmitter {
     this._options = options as RedisClusterClientOptions
 
     const parts = this._options.host.split(':')
-    const clientOptions = {
+    const clientOptions = options?.client?.options || {
       host: parts[0],
       port: parts[1] && parseInt(parts[1], 10),
       retry_strategy: (r: any) => Math.min(r.attempt * 100, 3000)
@@ -92,6 +93,10 @@ export default class RedisClusterClient extends EventEmitter {
         resolve(_clients)
       })
     })
+  }
+
+  get redisOptions() {
+    return this._options.client.options
   }
 
   destroy() {

@@ -3,6 +3,8 @@ import ReconWebSocket from 'reconnecting-websocket'
 import { WebSocketer } from 'websocketer'
 import { WebSocket, WebSocketServer } from 'ws'
 import WebSocketerRedisCluster from './WebSocketerRedisCluster'
+import { createClient } from 'redis'
+import RedisClusterClient from './RedisClusterClient'
 // import WebSocketerClusterServer from './WebSocketerClusterServer'
 
 describe('WebSocketerRedisCluster', () => {
@@ -167,6 +169,20 @@ describe('WebSocketerRedisCluster', () => {
     wsrServer11?.socket.close()
     wsrClient11?.destroy()
     wsrServer11?.destroy()
+  })
+
+  test('should create from existing client', async () => {
+
+    const options = {
+      host: '127.0.0.1',
+      port: 6379,
+      retry_strategy: (r: any) => Math.min(r.attempt * 100, 3000)
+    }
+    const redisClient = createClient(options)
+    const client = new RedisClusterClient({ client: redisClient })
+    expect(client.redisOptions.host).toBe(options.host)
+    expect(client.redisOptions.port).toBe(options.port)
+    expect(client.redisOptions.retry_strategy).toBe(options.retry_strategy)
   })
 
 })
