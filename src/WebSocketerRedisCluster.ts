@@ -4,6 +4,7 @@ import RedisClusterClient from './RedisClusterClient'
 
 export interface RedisClusterOptions {
   host: string
+  client: any
 }
 
 export default class WebSocketerRedisCluster extends EventEmitter implements Cluster {
@@ -12,10 +13,13 @@ export default class WebSocketerRedisCluster extends EventEmitter implements Clu
   private _socketers = new Set<WebSocketer>()
 
   constructor(
-    options: RedisClusterOptions) {
+    options: Partial<RedisClusterOptions>) {
 
     super()
-    this._client = new RedisClusterClient({ host: options.host })
+    this._client = new RedisClusterClient({
+      client: options.client,
+      host: options.host
+    })
     this._handleEvents()
   }
 
