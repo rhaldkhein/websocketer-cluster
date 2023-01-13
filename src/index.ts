@@ -1,9 +1,11 @@
 import WebSocketerClusterServer from './WebSocketerClusterServer'
 import WebSocketerCluster from './WebSocketerCluster'
 import WebSocketerRedisCluster from './WebSocketerRedisCluster'
+import RedisClusterClient from './RedisClusterClient'
 
 export {
-  WebSocketerClusterServer,
+  RedisClusterClient,
+  WebSocketerRedisCluster,
   WebSocketerCluster,
-  WebSocketerRedisCluster
+  WebSocketerClusterServer
 }
