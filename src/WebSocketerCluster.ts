@@ -31,7 +31,7 @@ export default class WebSocketerCluster implements Cluster {
         id: '_wsrc:c:' + nanoid()
       }
     )
-    this._handleSocketerEvents()
+    this._handleEvents()
   }
 
   get socketer() {
@@ -82,7 +82,7 @@ export default class WebSocketerCluster implements Cluster {
     }
   }
 
-  private _handleSocketerEvents() {
+  private _handleEvents() {
 
     this._socketer.listen(
       '_forward_',

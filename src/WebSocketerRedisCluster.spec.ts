@@ -2,23 +2,23 @@ import jest from 'jest-mock'
 import ReconWebSocket from 'reconnecting-websocket'
 import { WebSocketer } from 'websocketer'
 import { WebSocket, WebSocketServer } from 'ws'
-import WebSocketerCluster from './WebSocketerCluster'
-import WebSocketerClusterServer from './WebSocketerClusterServer'
+import WebSocketerRedisCluster from './WebSocketerRedisCluster'
+// import WebSocketerClusterServer from './WebSocketerClusterServer'
 
-describe('WebSocketerCluster', () => {
+describe('WebSocketerRedisCluster', () => {
 
   const h = 'ws://localhost'
   // cluster server
-  let wsrCS: WebSocketerClusterServer | undefined
+  // let wsrCS: WebSocketerClusterServer | undefined
 
   // cluster1, server1, client1
-  let wsrCC1: WebSocketerCluster | undefined
+  let wsrCC1: WebSocketerRedisCluster | undefined
   let wss1: WebSocketServer | undefined
   let wsserver1: WebSocket | undefined
   let wsclient1: WebSocket | undefined
 
   // cluster2, server2, client2
-  let wsrCC2: WebSocketerCluster | undefined
+  let wsrCC2: WebSocketerRedisCluster | undefined
   let wss2: WebSocketServer | undefined
   let wsserver2: WebSocket | undefined
   let wsclient2: WebSocket | undefined
@@ -31,37 +31,29 @@ describe('WebSocketerCluster', () => {
 
   beforeAll(async () => {
 
-    // create cluster server
-    await new Promise(resolve => {
-      wsrCS = new WebSocketerClusterServer({ port: 6000 })
-      wsrCS.server.once('listening', resolve)
-    })
+    wsrCC1 = new WebSocketerRedisCluster({ host: '127.0.0.1:6379' })
+    wsrCC2 = new WebSocketerRedisCluster({ host: '127.0.0.1:6379' })
 
-    // create cluster 1 & 2
-    await new Promise(resolve => {
-      wsrCC1 = new WebSocketerCluster({ origin: `${h}:6000` })
-      wsrCC1.socketer.socket.addEventListener('open', resolve)
-    })
-    await new Promise(resolve => {
-      wsrCC2 = new WebSocketerCluster({ origin: `${h}:6000` })
-      wsrCC2.socketer.socket.addEventListener('open', resolve)
-    })
+    await Promise.all([
+      new Promise(resolve => wsrCC1?.once('ready', resolve)),
+      new Promise(resolve => wsrCC2?.once('ready', resolve))
+    ])
 
     // create server and client 1 & 2
-    wss1 = new WebSocketServer({ port: 5001 })
+    wss1 = new WebSocketServer({ port: 5003 })
     wss1.once('connection', (ws) => {
       wsserver1 = ws
     })
     await new Promise(resolve => {
-      wsclient1 = new ReconWebSocket(`${h}:5001`, undefined, { WebSocket }) as any
+      wsclient1 = new ReconWebSocket(`${h}:5003`, undefined, { WebSocket }) as any
       wsclient1?.addEventListener('open', resolve)
     })
-    wss2 = new WebSocketServer({ port: 5002 })
+    wss2 = new WebSocketServer({ port: 5004 })
     wss2.once('connection', (ws) => {
       wsserver2 = ws
     })
     await new Promise(resolve => {
-      wsclient2 = new ReconWebSocket(`${h}:5002`, undefined, { WebSocket }) as any
+      wsclient2 = new ReconWebSocket(`${h}:5004`, undefined, { WebSocket }) as any
       wsclient2?.addEventListener('open', resolve)
     })
 
@@ -89,14 +81,6 @@ describe('WebSocketerCluster', () => {
     wsrCC1 = undefined
     wsrCC2?.destroy()
     wsrCC2 = undefined
-
-    // destroy cluster server
-    await new Promise(resolve => {
-      if (!wsrCS) return resolve(undefined)
-      wsrCS.server.on('close', resolve)
-      wsrCS.destroy()
-    })
-    wsrCS = undefined
 
   })
 
@@ -148,7 +132,7 @@ describe('WebSocketerCluster', () => {
     })
     await new Promise(resolve => {
       wsrClient11 = new WebSocketer(
-        new ReconWebSocket(`${h}:5001`, undefined, { WebSocket }),
+        new ReconWebSocket(`${h}:5003`, undefined, { WebSocket }),
         { id: 'client11' }
       )
       wsrClient11.socket.addEventListener('open', resolve)
