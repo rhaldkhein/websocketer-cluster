@@ -11,6 +11,8 @@ async function start() {
       console.log('receive 1', data)
       return data + '1'
     })
+    const clients = await client.clients
+    console.log(clients)
 
   } catch (error) {
     console.error(error)

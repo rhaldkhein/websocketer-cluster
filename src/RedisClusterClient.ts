@@ -78,6 +78,18 @@ export default class RedisClusterClient extends EventEmitter {
     this._publisher.on('end', () => this.emit('end'))
   }
 
+  get options() {
+    return this._options
+  }
+
+  get id() {
+    return this._id
+  }
+
+  get channel() {
+    return this._channel
+  }
+
   get clients() {
     return new Promise<Record<string, any>[]>((resolve, reject) => {
       this._publisher.client('list', (err: any, data: string) => {
