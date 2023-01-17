@@ -23,6 +23,10 @@ export default class WebSocketerRedisCluster extends EventEmitter implements Clu
     this._handleEvents()
   }
 
+  get client() {
+    return this._client
+  }
+
   get socketers() {
     return this._socketers
   }
