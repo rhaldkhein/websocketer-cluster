@@ -53,7 +53,7 @@ export default class RedisClusterClient extends EventEmitter {
       port: parts[1] && parseInt(parts[1], 10),
       retry_strategy: (r: any) => Math.min(r.attempt * 100, 3000)
     }
-    this._publisher = createClient(clientOptions)
+    this._publisher = options?.client || createClient(clientOptions)
     this._subscriber = createClient(clientOptions)
     this._publisher.client('setname', `${this._channel}:${this._id}`)
     this._subscriber.subscribe(this._channel)
@@ -88,6 +88,10 @@ export default class RedisClusterClient extends EventEmitter {
 
   get channel() {
     return this._channel
+  }
+
+  get client() {
+    return this._publisher
   }
 
   get clients() {
