@@ -124,6 +124,16 @@ describe('WebSocketerRedisCluster', () => {
     expect(payload).toBe('hi')
   })
 
+  test('should send and reply from cluster client to user client', async () => {
+
+    wsrClient10?.on('user_foo', data => {
+      expect(data).toBe('user_foo_data')
+      return 'user_foo_reply'
+    })
+    const payload = await wsrCC2?.client.send('user_foo', 'user_foo_data', 'client10')
+    expect(payload).toBe('user_foo_reply')
+  })
+
   test('should send and reply with multiple clients', async () => {
 
     // prepare
@@ -183,6 +193,7 @@ describe('WebSocketerRedisCluster', () => {
     expect(client.redisOptions.host).toBe(options.host)
     expect(client.redisOptions.port).toBe(options.port)
     expect(client.redisOptions.retry_strategy).toBe(options.retry_strategy)
+    client.destroy()
   })
 
 })

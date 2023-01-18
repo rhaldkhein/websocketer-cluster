@@ -63,8 +63,13 @@ export default class RedisClusterClient extends EventEmitter {
         if (channel !== this._channel) return
         const data: RequestData<any> = JSON.parse(message)
         if (data.ns !== this._channel) return
-        if (data.to && data.to !== this._id) return
-        if (data.rq) {
+        if (data.to && data.to !== this._id) {
+          const newData = this.createRequestData('_forward_', data)
+          const reply = await this._handleRequest(newData)
+          if (reply.pl?.ns === this._channel) {
+            this.sendRequest(reply.pl, { noReply: true })
+          }
+        } else if (data.rq) {
           const reply = await this._handleRequest(data)
           this.sendRequest(reply, { noReply: true })
         } else {
@@ -123,6 +128,22 @@ export default class RedisClusterClient extends EventEmitter {
     this._subscriber.quit()
   }
 
+  createRequestData(
+    name: string,
+    payload?: Payload,
+    to?: string) {
+
+    return {
+      ns: this._channel,
+      id: nanoid(24),
+      nm: name,
+      rq: true,
+      pl: payload,
+      fr: this._id,
+      to
+    }
+  }
+
   endRequestData(
     request: RequestData,
     opt?: {
@@ -154,18 +175,7 @@ export default class RedisClusterClient extends EventEmitter {
     to?: string,
     opt?: SendOptions) {
 
-    return this.sendRequest<T>(
-      {
-        ns: this._channel,
-        id: nanoid(24),
-        nm: name,
-        rq: true,
-        pl: payload,
-        fr: this._id,
-        to
-      },
-      opt
-    )
+    return this.sendRequest<T>(this.createRequestData(name, payload, to), opt)
   }
 
   async sendRequest<T>(
