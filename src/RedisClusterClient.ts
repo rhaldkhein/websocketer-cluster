@@ -148,13 +148,13 @@ export default class RedisClusterClient extends EventEmitter {
     }
   }
 
-  async send(
+  async send<T>(
     name: string,
     payload?: Payload,
     to?: string,
     opt?: SendOptions) {
 
-    return this.sendRequest(
+    return this.sendRequest<T>(
       {
         ns: this._channel,
         id: nanoid(24),
@@ -168,10 +168,10 @@ export default class RedisClusterClient extends EventEmitter {
     )
   }
 
-  async sendRequest(
+  async sendRequest<T>(
     request: RequestData,
     opt?: SendOptions):
-    Promise<RequestData> {
+    Promise<T> {
 
     return new Promise((resolve, reject) => {
       const message = JSON.stringify(request)
@@ -210,15 +210,16 @@ export default class RedisClusterClient extends EventEmitter {
         this._requests.set(`${request.id}`, request)
       } else {
         request.rs = undefined
-        resolve({} as RequestData)
+        resolve({} as T)
       }
     })
   }
 
-  async broadcast(
+  async broadcast<T>(
     name: string,
     payload?: Payload,
-    opt?: BroadcastOptions) {
+    opt?: BroadcastOptions):
+    Promise<(T | undefined)[]> {
 
     const clients = await this.clients
     if (!clients) return []

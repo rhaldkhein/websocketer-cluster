@@ -52,7 +52,7 @@ export default class WebSocketerRedisCluster extends EventEmitter implements Clu
   async handleRequest<T>(
     request: RequestData<any>): Promise<RequestData<T>> {
 
-    const results = await this._client.broadcast('_forward_', request)
+    const results = await this._client.broadcast<RequestData<T>>('_forward_', request)
     const result = results.find(v => v !== undefined)
     if (!result) {
       throw new WebSocketerError(
