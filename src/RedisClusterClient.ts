@@ -17,6 +17,7 @@ export interface RedisClusterClientOptions {
   client: any
   id: string
   timeout: number
+  debug?: boolean
 }
 
 export interface SendOptions {
@@ -192,7 +193,7 @@ export default class RedisClusterClient extends EventEmitter {
           if (err) {
             return reject(
               new WebSocketerError(
-                err.message,
+                `${err.message}${this._options.debug ? ` -> ${request.nm}` : ''}`,
                 err.code,
                 err.payload,
                 'RemoteWebSocketerError'
