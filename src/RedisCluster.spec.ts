@@ -2,28 +2,33 @@ import jest from 'jest-mock'
 import ReconWebSocket from 'reconnecting-websocket'
 import { WebSocketer } from 'websocketer'
 import { WebSocket, WebSocketServer } from 'ws'
-import WebSocketerRedisCluster from './WebSocketerRedisCluster'
+import { RedisCluster } from './'
 import { createClient } from 'redis'
 import RedisClusterClient from './RedisClusterClient'
+import Client from './Client'
 // import WebSocketerClusterServer from './WebSocketerClusterServer'
 
-describe('WebSocketerRedisCluster', () => {
+describe('RedisCluster', () => {
 
   const h = 'ws://localhost'
+  const r = '127.0.0.1:6379'
   // cluster server
   // let wsrCS: WebSocketerClusterServer | undefined
 
   // cluster1, server1, client1
-  let wsrCC1: WebSocketerRedisCluster | undefined
+  let wsrCC1: RedisCluster | undefined
   let wss1: WebSocketServer | undefined
   let wsserver1: WebSocket | undefined
   let wsclient1: WebSocket | undefined
 
   // cluster2, server2, client2
-  let wsrCC2: WebSocketerRedisCluster | undefined
+  let wsrCC2: RedisCluster | undefined
   let wss2: WebSocketServer | undefined
   let wsserver2: WebSocket | undefined
   let wsclient2: WebSocket | undefined
+
+  let wsrCC3: RedisCluster | undefined
+  let wsrCC4: RedisCluster | undefined
 
   // websocketers
   let wsrServer10: WebSocketer | undefined
@@ -31,10 +36,15 @@ describe('WebSocketerRedisCluster', () => {
   let wsrServer20: WebSocketer | undefined
   let wsrClient20: WebSocketer | undefined
 
+  let rccServer30: Client | undefined
+  let rccServer40: Client | undefined
+
   beforeAll(async () => {
 
-    wsrCC1 = new WebSocketerRedisCluster({ host: '127.0.0.1:6379' })
-    wsrCC2 = new WebSocketerRedisCluster({ host: '127.0.0.1:6379' })
+    wsrCC1 = new RedisCluster({ host: r, debug: true, id: 'cluster1' })
+    wsrCC2 = new RedisCluster({ host: r, debug: true, id: 'cluster2' })
+    wsrCC3 = new RedisCluster({ host: r, debug: true, id: 'cluster3' })
+    wsrCC4 = new RedisCluster({ host: r, debug: true, id: 'cluster4' })
 
     await Promise.all([
       new Promise(resolve => wsrCC1?.once('ready', resolve)),
@@ -83,20 +93,28 @@ describe('WebSocketerRedisCluster', () => {
     wsrCC1 = undefined
     wsrCC2?.destroy()
     wsrCC2 = undefined
+    wsrCC3?.destroy()
+    wsrCC3 = undefined
+    wsrCC4?.destroy()
+    wsrCC4 = undefined
 
   })
 
   beforeEach(() => {
-    wsrServer10 = new WebSocketer(wsserver1, { cluster: wsrCC1 })
-    wsrClient10 = new WebSocketer(wsclient1, { id: 'client10' })
-    wsrServer20 = new WebSocketer(wsserver2, { cluster: wsrCC2 })
-    wsrClient20 = new WebSocketer(wsclient2, { id: 'client20' })
+    wsrServer10 = new WebSocketer(wsserver1, { debug: true, id: 'server10', cluster: wsrCC1 })
+    wsrClient10 = new WebSocketer(wsclient1, { debug: true, id: 'client10' })
+    wsrServer20 = new WebSocketer(wsserver2, { debug: true, id: 'server20', cluster: wsrCC2 })
+    wsrClient20 = new WebSocketer(wsclient2, { debug: true, id: 'client20' })
+    rccServer30 = new Client({ debug: true, cluster: wsrCC3, id: 'client30' })
+    rccServer40 = new Client({ debug: true, cluster: wsrCC4, id: 'client40' })
   })
   afterEach(() => {
     wsrServer10?.destroy()
     wsrClient10?.destroy()
     wsrServer20?.destroy()
     wsrClient20?.destroy()
+    rccServer30?.destroy()
+    rccServer40?.destroy()
   })
 
   test('start', () => {
@@ -110,7 +128,7 @@ describe('WebSocketerRedisCluster', () => {
       expect(data).toBe('bar')
       return 'hi'
     })
-    const payload = await wsrClient20?.send('foo', 'bar', 'client10')
+    const payload = await wsrClient20?.request('foo', 'bar', 'client10')
     expect(payload).toBe('hi')
   })
 
@@ -120,18 +138,58 @@ describe('WebSocketerRedisCluster', () => {
       expect(data).toBe('bar')
       return 'hi'
     })
-    const payload = await wsrClient20?.send('foo', 'bar', 'client20')
+    const payload = await wsrClient20?.request('foo', 'bar', 'client20')
     expect(payload).toBe('hi')
   })
 
-  test('should send and reply from cluster client to user client', async () => {
+  test('should send and reply from redis client to user client', async () => {
 
-    wsrClient10?.on('user_foo', data => {
-      expect(data).toBe('user_foo_data')
-      return 'user_foo_reply'
+    wsrClient10?.on('redis_foo', data => {
+      expect(data).toBe('redis_foo_data')
+      return 'redis_foo_reply'
     })
-    const payload = await wsrCC2?.client.send('user_foo', 'user_foo_data', 'client10')
-    expect(payload).toBe('user_foo_reply')
+    const reply = await rccServer30?.request('redis_foo', 'redis_foo_data', 'client10')
+    expect(reply).toBe('redis_foo_reply')
+  })
+
+  test('should send and reply from user client to redis client', async () => {
+
+    rccServer40?.on('redis_bar', data => {
+      expect(data).toBe('redis_bar_data')
+      return 'redis_bar_reply'
+    })
+    const reply = await wsrClient20?.request('redis_bar', 'redis_bar_data', 'client40')
+    expect(reply).toBe('redis_bar_reply')
+  })
+
+  test('should send and reply from websocketer server to redis client', async () => {
+
+    rccServer40?.on('redis_baz', data => {
+      expect(data).toBe('redis_baz_data')
+      return 'redis_baz_reply'
+    })
+    const reply = await wsrServer20?.request('redis_baz', 'redis_baz_data', 'client40')
+    expect(reply).toBe('redis_baz_reply')
+  })
+
+  test('should send and reply from redis clients', async () => {
+
+    rccServer40?.on('redis_fox', data => {
+      expect(data).toBe('redis_fox_data')
+      return 'redis_fox_reply'
+    })
+    const reply = await rccServer30?.request('redis_fox', 'redis_fox_data', 'client40')
+    expect(reply).toBe('redis_fox_reply')
+  })
+
+  test('should send and reply from websocketer clients', async () => {
+
+    wsrServer20?.on('redis_yay', data => {
+      expect(data).toBe('redis_yay_data')
+      return 'redis_yay_reply'
+    })
+    const reply = await wsrServer10?.request('redis_yay', 'redis_yay_data', 'server20')
+    expect(reply).toBe('redis_yay_reply')
   })
 
   test('should send and reply with multiple clients', async () => {
@@ -147,7 +205,7 @@ describe('WebSocketerRedisCluster', () => {
         new ReconWebSocket(`${h}:5003`, undefined, { WebSocket }),
         { id: 'client11' }
       )
-      wsrClient11.socket.addEventListener('open', resolve)
+      wsrClient11.client.addEventListener('open', resolve)
     })
     const fnBar = jest.fn((data: any) => data)
 
@@ -169,14 +227,14 @@ describe('WebSocketerRedisCluster', () => {
       return 'hi20'
     })
 
-    const plFoo = await wsrClient20?.send('foo', 'foo11', 'client11')
-    const plBar = await wsrClient20?.send('bar', 'barbar', 'client10')
+    const plFoo = await wsrClient20?.request('foo', 'foo11', 'client11')
+    const plBar = await wsrClient20?.request('bar', 'barbar', 'client10')
     expect(plFoo).toBe('hi11')
     expect(plBar).toBe('barbar')
     expect(fnBar.mock.calls).toHaveLength(1)
 
-    wsrClient11?.socket.close()
-    wsrServer11?.socket.close()
+    wsrClient11?.client.close()
+    wsrServer11?.client.close()
     wsrClient11?.destroy()
     wsrServer11?.destroy()
   })

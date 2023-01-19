@@ -1,15 +1,12 @@
-import { createClient } from 'redis'
 import EventEmitter from 'eventemitter3'
-import { customAlphabet } from 'nanoid'
 import {
-  Payload,
-  RequestData,
-  ResponseHandler,
-  WebSocketerError
+  createClient
+} from 'redis'
+import {
+  generateId,
+  RequestData
 } from 'websocketer'
 
-const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
-const nanoid = customAlphabet(chars)
 const rxSpace = / /ig
 
 export interface RedisClusterClientOptions {
@@ -31,7 +28,6 @@ export interface BroadcastOptions extends SendOptions {
 export default class RedisClusterClient extends EventEmitter {
 
   private _options: RedisClusterClientOptions
-  private _requests = new Map<string, RequestData>()
   private _channel = 'websocketer'
   private _publisher?: any
   private _subscriber?: any
@@ -42,7 +38,7 @@ export default class RedisClusterClient extends EventEmitter {
 
     super()
     options = options || {}
-    options.id = options.id || nanoid(24)
+    options.id = options.id || generateId(24)
     options.timeout = options.timeout || 60
     options.host = options.host || '127.0.0.1:6379'
     this._id = options.id
@@ -64,18 +60,7 @@ export default class RedisClusterClient extends EventEmitter {
         if (channel !== this._channel) return
         const data: RequestData<any> = JSON.parse(message)
         if (data.ns !== this._channel) return
-        if (data.to && data.to !== this._id) {
-          const newData = this.createRequestData('_forward_', data)
-          const reply = await this._handleRequest(newData)
-          if (reply.pl?.ns === this._channel) {
-            this.sendRequest(reply.pl, { noReply: true })
-          }
-        } else if (data.rq) {
-          const reply = await this._handleRequest(data)
-          this.sendRequest(reply, { noReply: true })
-        } else {
-          this._handleResponse(data)
-        }
+        this.emit('message', data)
       }
     )
     this._publisher.on('ready', () => this.emit('ready'))
@@ -123,191 +108,15 @@ export default class RedisClusterClient extends EventEmitter {
 
   destroy() {
     this.removeAllListeners()
-    this._requests.forEach(data => clearTimeout(data.ti))
-    this._requests.clear()
     this._publisher.quit()
     this._subscriber.quit()
   }
 
-  createRequestData(
-    name: string,
-    payload?: Payload,
-    to?: string) {
+  sendRequest(
+    request: RequestData) {
 
-    return {
-      ns: this._channel,
-      id: nanoid(24),
-      nm: name,
-      rq: true,
-      pl: payload,
-      fr: this._id,
-      to
-    }
-  }
-
-  endRequestData(
-    request: RequestData,
-    opt?: {
-      error?: any
-      payload?: any
-      from?: string
-      to?: string
-    }):
-    RequestData {
-
-    // do not change request data if it's already a response
-    if (!request.rq) return request
-    // update request data
-    return {
-      ns: request.ns,
-      id: request.id,
-      nm: request.nm,
-      rq: false,
-      pl: opt?.payload,
-      er: opt?.error,
-      fr: opt?.from || (request.rq ? request.to : request.fr) || '',
-      to: opt?.to || (request.rq ? request.fr : request.to) || ''
-    }
-  }
-
-  async send<T>(
-    name: string,
-    payload?: Payload,
-    to?: string,
-    opt?: SendOptions) {
-
-    return this.sendRequest<T>(this.createRequestData(name, payload, to), opt)
-  }
-
-  async sendRequest<T>(
-    request: RequestData,
-    opt?: SendOptions):
-    Promise<T> {
-
-    return new Promise((resolve, reject) => {
-      const message = JSON.stringify(request)
-      this._publisher.publish(this._channel, message)
-      // this._subscriber.emit(this._channel, message)
-      if (!opt?.noReply) {
-        const response: ResponseHandler = (err, resPayload) => {
-          if (err) {
-            return reject(
-              new WebSocketerError(
-                `${err.message}${this._options.debug ? ` -> ${request.nm}` : ''}`,
-                err.code,
-                err.payload,
-                'RemoteWebSocketerError'
-              )
-            )
-          }
-          resolve(resPayload)
-        }
-        request.rs = response
-        request.ti = setTimeout(
-          () => {
-            request.ti = null
-            this._requests.delete(request.id)
-            response(
-              new WebSocketerError(
-                'Timeout reached',
-                'ERR_WSR_TIMEOUT'
-              ),
-              undefined,
-              request
-            )
-          },
-          1000 * this._options.timeout
-        )
-        this._requests.set(`${request.id}`, request)
-      } else {
-        request.rs = undefined
-        resolve({} as T)
-      }
-    })
-  }
-
-  async broadcast<T>(
-    name: string,
-    payload?: Payload,
-    opt?: BroadcastOptions):
-    Promise<(T | undefined)[]> {
-
-    const clients = await this.clients
-    if (!clients) return []
-    const clientIds = clients.map(c => c.name.split(':')[1])
-    const requests = clientIds.map(id => this.send(name, payload, id, opt))
-    const results = await Promise.allSettled(requests)
-    return results.map(result => {
-      if (result.status === 'rejected' && !opt?.continue) throw result.reason
-      // @ts-ignore
-      return result.value
-    })
-  }
-
-  private async _handleRequest(
-    data: RequestData):
-    Promise<RequestData> {
-
-    try {
-      let payload
-      // get the listeners
-      const listeners = this.listeners(data.nm)
-      if (!listeners || !listeners.length) {
-        // if no listeners, reply with error
-        throw new WebSocketerError(
-          'No listener',
-          'ERR_WSR_NO_LISTENER'
-        )
-      }
-      // trigger listeners
-      for (let i = 0; i < listeners.length; i++) {
-        payload = await listeners[i](data.pl, data)
-      }
-      // end request data
-      return this.endRequestData(
-        data,
-        {
-          payload,
-          from: this._id,
-          to: data.fr
-        }
-      )
-    } catch (error: any) {
-      // attach any error and end request data
-      return this.endRequestData(
-        data,
-        {
-          error: {
-            name: error.name,
-            code: error.code || 'ERR_WSR_INTERNAL',
-            message: error.message,
-            payload: error.payload
-          },
-          from: this._id,
-          to: data.fr
-        }
-      )
-    }
-  }
-
-  private _handleResponse(
-    data: RequestData) {
-
-    // get the request object
-    const request = this._requests.get(data.id)
-    if (!request) return
-    // handle the response data
-    if (typeof request.rs === 'function') {
-      request.rs(
-        data.er || null,
-        data.pl,
-        request
-      )
-    }
-    // delete the request and timeout because it's already handled
-    this._requests.delete(request.id)
-    clearTimeout(request.ti)
-    request.ti = null
+    const message = JSON.stringify(request)
+    this._publisher.publish(this._channel, message)
   }
 
 }
