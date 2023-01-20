@@ -1,6 +1,6 @@
 {
   "name": "websocketer-cluster",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Cluster manager using WebSocket PubSub",
   "repository": {
     "type": "git",
