@@ -31,20 +31,20 @@ describe('RedisCluster', () => {
   let wsrCC4: RedisCluster | undefined
 
   // websocketers
-  let wsrServer10: WebSocketer | undefined
-  let wsrClient10: WebSocketer | undefined
-  let wsrServer20: WebSocketer | undefined
-  let wsrClient20: WebSocketer | undefined
+  let wsrServer10: WebSocketer<any, RedisCluster> | undefined
+  let wsrClient10: WebSocketer<any, RedisCluster> | undefined
+  let wsrServer20: WebSocketer<any, RedisCluster> | undefined
+  let wsrClient20: WebSocketer<any, RedisCluster> | undefined
 
   let rccServer30: Client | undefined
   let rccServer40: Client | undefined
 
   beforeAll(async () => {
 
-    wsrCC1 = new RedisCluster({ host: r, debug: true, id: 'cluster1' })
-    wsrCC2 = new RedisCluster({ host: r, debug: true, id: 'cluster2' })
-    wsrCC3 = new RedisCluster({ host: r, debug: true, id: 'cluster3' })
-    wsrCC4 = new RedisCluster({ host: r, debug: true, id: 'cluster4' })
+    wsrCC1 = new RedisCluster({ host: r, debug: true })
+    wsrCC2 = new RedisCluster({ host: r, debug: true })
+    wsrCC3 = new RedisCluster({ host: r, debug: true })
+    wsrCC4 = new RedisCluster({ host: r, debug: true })
 
     await Promise.all([
       new Promise(resolve => wsrCC1?.once('ready', resolve)),
@@ -122,7 +122,7 @@ describe('RedisCluster', () => {
     expect(1).toBe(1)
   })
 
-  test('should send and reply', async () => {
+  test('should request', async () => {
 
     wsrClient10?.on('foo', data => {
       expect(data).toBe('bar')
@@ -132,7 +132,7 @@ describe('RedisCluster', () => {
     expect(payload).toBe('hi')
   })
 
-  test('should send and reply to self', async () => {
+  test('should request to self', async () => {
 
     wsrClient20?.on('foo', data => {
       expect(data).toBe('bar')
@@ -142,7 +142,7 @@ describe('RedisCluster', () => {
     expect(payload).toBe('hi')
   })
 
-  test('should send and reply from redis client to user client', async () => {
+  test('should request from redis client to user client', async () => {
 
     wsrClient10?.on('redis_foo', data => {
       expect(data).toBe('redis_foo_data')
@@ -152,7 +152,7 @@ describe('RedisCluster', () => {
     expect(reply).toBe('redis_foo_reply')
   })
 
-  test('should send and reply from user client to redis client', async () => {
+  test('should request from user client to redis client', async () => {
 
     rccServer40?.on('redis_bar', data => {
       expect(data).toBe('redis_bar_data')
@@ -162,7 +162,7 @@ describe('RedisCluster', () => {
     expect(reply).toBe('redis_bar_reply')
   })
 
-  test('should send and reply from websocketer server to redis client', async () => {
+  test('should request from websocketer server to redis client', async () => {
 
     rccServer40?.on('redis_baz', data => {
       expect(data).toBe('redis_baz_data')
@@ -172,7 +172,7 @@ describe('RedisCluster', () => {
     expect(reply).toBe('redis_baz_reply')
   })
 
-  test('should send and reply from redis clients', async () => {
+  test('should request from redis clients', async () => {
 
     rccServer40?.on('redis_fox', data => {
       expect(data).toBe('redis_fox_data')
@@ -182,7 +182,7 @@ describe('RedisCluster', () => {
     expect(reply).toBe('redis_fox_reply')
   })
 
-  test('should send and reply from websocketer clients', async () => {
+  test('should request from websocketer clients', async () => {
 
     wsrServer20?.on('redis_yay', data => {
       expect(data).toBe('redis_yay_data')
@@ -192,7 +192,86 @@ describe('RedisCluster', () => {
     expect(reply).toBe('redis_yay_reply')
   })
 
-  test('should send and reply with multiple clients', async () => {
+  test('should request many from websocketer server client', async () => {
+
+    wsrServer20?.on('redis_alice', data => {
+      expect(data).toBe('redis_alice_data')
+      return 'redis_alice_reply_2'
+    })
+    rccServer30?.on('redis_alice', data => {
+      expect(data).toBe('redis_alice_data')
+      return 'redis_alice_reply_3'
+    })
+    const results = await wsrServer10?.requestMany(
+      'redis_alice', 'redis_alice_data',
+      ['server20', 'client30']
+    )
+    expect(results && results[0]).toBe('redis_alice_reply_2')
+    expect(results && results[1]).toBe('redis_alice_reply_3')
+  })
+
+  test('should request many from redis client', async () => {
+
+    wsrServer20?.on('redis_bob', data => {
+      expect(data).toBe('redis_bob_data')
+      return 'redis_bob_reply_2'
+    })
+    rccServer30?.on('redis_bob', data => {
+      expect(data).toBe('redis_bob_data')
+      return 'redis_bob_reply_3'
+    })
+    const results = await rccServer40?.requestMany(
+      'redis_bob', 'redis_bob_data',
+      ['server20', 'client30']
+    )
+    expect(results && results[0]).toBe('redis_bob_reply_2')
+    expect(results && results[1]).toBe('redis_bob_reply_3')
+  })
+
+  test('should request many from user client', async () => {
+
+    wsrServer20?.on('redis_charles', data => {
+      expect(data).toBe('redis_charles_data')
+      return 'redis_charles_reply_2'
+    })
+    rccServer30?.on('redis_charles', data => {
+      expect(data).toBe('redis_charles_data')
+      return 'redis_charles_reply_3'
+    })
+    const results = await wsrClient10?.requestMany(
+      'redis_charles', 'redis_charles_data',
+      ['server20', 'client30']
+    )
+    expect(results && results[0]).toBe('redis_charles_reply_2')
+    expect(results && results[1]).toBe('redis_charles_reply_3')
+  })
+
+  test('should request many to clusters', async () => {
+
+    wsrServer20?.on('redis_danti', data => {
+      expect(data).toBe('redis_danti_data')
+      return 'redis_danti_reply_2'
+    })
+    rccServer30?.on('redis_danti', data => {
+      expect(data).toBe('redis_danti_data')
+      return 'redis_danti_reply_3'
+    })
+    rccServer40?.on('redis_danti', data => {
+      expect(data).toBe('redis_danti_data')
+      return 'redis_danti_reply_4'
+    })
+    const ids = await wsrServer10?.cluster?.cluster.clientIds() || []
+    const results = await wsrServer10?.requestMany(
+      'redis_danti', 'redis_danti_data',
+      ids,
+      { continue: true }
+    )
+    expect(results && results.includes('redis_danti_reply_2')).toBe(false)
+    expect(results && results.includes('redis_danti_reply_3')).toBe(true)
+    expect(results && results.includes('redis_danti_reply_4')).toBe(true)
+  })
+
+  test('should request with multiple clients', async () => {
 
     // prepare
     let wsrServer11: WebSocketer | undefined

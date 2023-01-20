@@ -52,7 +52,6 @@ export default class RedisClusterClient extends EventEmitter {
     }
     this._publisher = options?.client || createClient(clientOptions)
     this._subscriber = createClient(clientOptions)
-    this._publisher.client('setname', `${this._channel}:${this._id}`)
     this._subscriber.subscribe(this._channel)
     this._subscriber.on(
       'message',
@@ -85,7 +84,24 @@ export default class RedisClusterClient extends EventEmitter {
     return this._publisher
   }
 
-  get clients() {
+  get redisOptions() {
+    return this._options.client.options
+  }
+
+  destroy() {
+    this.removeAllListeners()
+    this._publisher.quit()
+    this._subscriber.quit()
+  }
+
+  setId(
+    id: string) {
+
+    this._id = id
+    this._publisher.client('setname', `${this._channel}:${this._id}`)
+  }
+
+  async clients() {
     return new Promise<Record<string, any>[]>((resolve, reject) => {
       this._publisher.client('list', (err: any, data: string) => {
         if (err) return reject(err)
@@ -102,14 +118,10 @@ export default class RedisClusterClient extends EventEmitter {
     })
   }
 
-  get redisOptions() {
-    return this._options.client.options
-  }
-
-  destroy() {
-    this.removeAllListeners()
-    this._publisher.quit()
-    this._subscriber.quit()
+  async clientIds() {
+    const clients = await this.clients()
+    if (!clients) return []
+    return clients.map(c => c.name.split(':')[1])
   }
 
   sendRequest(
