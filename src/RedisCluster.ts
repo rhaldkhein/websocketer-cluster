@@ -4,8 +4,7 @@ import {
   RequestData,
   Cluster as ICluster,
   Client as IClient,
-  Payload,
-  RequestManyOptions
+  Payload
 } from 'websocketer'
 
 export interface RedisClusterOptions {

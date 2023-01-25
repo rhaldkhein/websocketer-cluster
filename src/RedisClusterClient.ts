@@ -127,8 +127,7 @@ export default class RedisClusterClient extends EventEmitter {
   sendRequest(
     request: RequestData) {
 
-    const message = JSON.stringify(request)
-    this._publisher.publish(this._channel, message)
+    this._publisher.publish(this._channel, JSON.stringify(request))
   }
 
 }

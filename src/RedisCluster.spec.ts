@@ -142,6 +142,26 @@ describe('RedisCluster', () => {
     expect(payload).toBe('hi')
   })
 
+  test('should error no listener', async () => {
+
+    await expect(wsrClient20?.request('no_listener', 1, 'client10')).rejects
+      .toMatchObject({ code: 'ERR_WSR_NO_LISTENER' })
+  })
+
+  test.skip('should error no destination', async () => {
+
+    // #FIX need to fix and throw error when no destination.
+    // currently only triggers timeout error, which is bad.
+
+    wsrClient10?.on('foo', data => {
+      expect(data).toBe('bar')
+      return 'hi'
+    })
+
+    await expect(wsrClient20?.request('foo', 'bar', 'clientXX')).rejects
+      .toMatchObject({ code: 'ERR_WSR_NO_DESTINATION' })
+  })
+
   test('should request from redis client to user client', async () => {
 
     wsrClient10?.on('redis_foo', data => {
@@ -194,6 +214,10 @@ describe('RedisCluster', () => {
 
   test('should request many from websocketer server client', async () => {
 
+    wsrServer10?.on('redis_alice', data => {
+      expect(data).toBe('redis_alice_data')
+      return 'redis_alice_reply_1'
+    })
     wsrServer20?.on('redis_alice', data => {
       expect(data).toBe('redis_alice_data')
       return 'redis_alice_reply_2'
@@ -204,10 +228,11 @@ describe('RedisCluster', () => {
     })
     const results = await wsrServer10?.requestMany(
       'redis_alice', 'redis_alice_data',
-      ['server20', 'client30']
+      ['server20', 'server10', 'client30']
     )
     expect(results && results[0]).toBe('redis_alice_reply_2')
-    expect(results && results[1]).toBe('redis_alice_reply_3')
+    expect(results && results[1]).toBe('redis_alice_reply_1')
+    expect(results && results[2]).toBe('redis_alice_reply_3')
   })
 
   test('should request many from redis client', async () => {
@@ -220,16 +245,25 @@ describe('RedisCluster', () => {
       expect(data).toBe('redis_bob_data')
       return 'redis_bob_reply_3'
     })
+    rccServer40?.on('redis_bob', data => {
+      expect(data).toBe('redis_bob_data')
+      return 'redis_bob_reply_4'
+    })
     const results = await rccServer40?.requestMany(
       'redis_bob', 'redis_bob_data',
-      ['server20', 'client30']
+      ['server20', 'client30', 'client40']
     )
     expect(results && results[0]).toBe('redis_bob_reply_2')
     expect(results && results[1]).toBe('redis_bob_reply_3')
+    expect(results && results[2]).toBe('redis_bob_reply_4')
   })
 
   test('should request many from user client', async () => {
 
+    wsrClient10?.on('redis_charles', data => {
+      expect(data).toBe('redis_charles_data')
+      return 'redis_charles_reply_1'
+    })
     wsrServer20?.on('redis_charles', data => {
       expect(data).toBe('redis_charles_data')
       return 'redis_charles_reply_2'
@@ -240,10 +274,35 @@ describe('RedisCluster', () => {
     })
     const results = await wsrClient10?.requestMany(
       'redis_charles', 'redis_charles_data',
-      ['server20', 'client30']
+      ['client10', 'server20', 'client30']
     )
-    expect(results && results[0]).toBe('redis_charles_reply_2')
-    expect(results && results[1]).toBe('redis_charles_reply_3')
+    expect(results && results[0]).toBe('redis_charles_reply_1')
+    expect(results && results[1]).toBe('redis_charles_reply_2')
+    expect(results && results[2]).toBe('redis_charles_reply_3')
+  })
+
+  test('should request many with no listeners', async () => {
+
+    wsrServer20?.on('redis_echo', data => {
+      expect(data).toBe('redis_echo_data')
+      return 'redis_echo_reply_2'
+    })
+    rccServer30?.on('redis_echo', data => {
+      expect(data).toBe('redis_echo_data')
+      return 'redis_echo_reply_3'
+    })
+    rccServer40?.on('redis_echo', data => {
+      expect(data).toBe('redis_echo_data')
+      return 'redis_echo_reply_4'
+    })
+    const results = await wsrServer10?.requestMany(
+      'redis_echo', 'redis_echo_data',
+      ['server10', 'server20', 'client10', 'client20', 'client30', 'client40'],
+      { continue: true }
+    )
+    expect(results && results.includes('redis_echo_reply_2')).toBe(true)
+    expect(results && results.includes('redis_echo_reply_3')).toBe(true)
+    expect(results && results.includes('redis_echo_reply_4')).toBe(true)
   })
 
   test('should request many to clusters', async () => {
@@ -269,6 +328,18 @@ describe('RedisCluster', () => {
     expect(results && results.includes('redis_danti_reply_2')).toBe(false)
     expect(results && results.includes('redis_danti_reply_3')).toBe(true)
     expect(results && results.includes('redis_danti_reply_4')).toBe(true)
+  })
+
+  test('should error request many without continue', async () => {
+
+    wsrServer20?.on('redis_fancon', data => {
+      expect(data).toBe('redis_fancon_data')
+      return 'redis_fancon_reply_2'
+    })
+    await expect(wsrServer10?.requestMany(
+      'redis_fancon', 'redis_fancon_data',
+      ['server20', 'client30']
+    )).rejects.toThrow()
   })
 
   test('should request with multiple clients', async () => {
