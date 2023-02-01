@@ -45,21 +45,24 @@ export default class RedisClusterClient extends EventEmitter {
     this._options = options as RedisClusterClientOptions
 
     const parts = this._options.host.split(':')
-    const clientOptions = options?.client?.options || {
+    this._publisher = options?.client || createClient({
       host: parts[0],
       port: parts[1] && parseInt(parts[1], 10),
       retry_strategy: (r: any) => Math.min(r.attempt * 100, 3000)
-    }
-    this._publisher = options?.client || createClient(clientOptions)
-    this._subscriber = createClient(clientOptions)
+    })
+    this._subscriber = createClient(this._publisher.options)
     this._subscriber.subscribe(this._channel)
     this._subscriber.on(
       'message',
       async (channel: string, message: string) => {
-        if (channel !== this._channel) return
-        const data: RequestData<any> = JSON.parse(message)
-        if (data.ns !== this._channel) return
-        this.emit('message', data)
+        try {
+          if (channel !== this._channel) return
+          const data: RequestData<any> = JSON.parse(message)
+          if (data.ns !== this._channel) return
+          this.emit('message', data)
+        } catch (error) {
+          // #TODO add handler
+        }
       }
     )
     this._publisher.on('ready', () => this.emit('ready'))
@@ -82,6 +85,10 @@ export default class RedisClusterClient extends EventEmitter {
 
   get client() {
     return this._publisher
+  }
+
+  get subscriber() {
+    return this._subscriber
   }
 
   get redisOptions() {

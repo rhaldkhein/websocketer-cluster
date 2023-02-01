@@ -93,14 +93,18 @@ export default class RedisCluster extends EventEmitter implements ICluster {
             break
           }
         }
-        if (targetIsHere === true) {
-          // server, handle here
-          reply = await targetClient?.handleMessage(data)
-        } else if (targetIsHere === false) {
-          // client, forward to user client, reply should be a RequestData
-          reply = await targetClient?.request('_request_', data)
+        try {
+          if (targetIsHere === true) {
+            // server, handle here
+            reply = await targetClient?.handleMessage(data)
+          } else if (targetIsHere === false) {
+            // client, forward to user client, reply should be a RequestData
+            reply = await targetClient?.request('_request_', data)
+          }
+          if (reply && data.rq) this.handleRequest(reply)
+        } catch (error) {
+          // #TODO add handler
         }
-        if (reply && data.rq) this.handleRequest(reply)
       }
     )
 
