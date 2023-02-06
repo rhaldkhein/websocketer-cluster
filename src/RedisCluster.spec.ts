@@ -46,11 +46,6 @@ describe('RedisCluster', () => {
     wsrCC3 = new RedisCluster({ host: r, debug: true })
     wsrCC4 = new RedisCluster({ host: r, debug: true })
 
-    await Promise.all([
-      new Promise(resolve => wsrCC1?.once('ready', resolve)),
-      new Promise(resolve => wsrCC2?.once('ready', resolve))
-    ])
-
     // create server and client 1 & 2
     wss1 = new WebSocketServer({ port: 5003 })
     wss1.once('connection', (ws) => {
@@ -145,13 +140,10 @@ describe('RedisCluster', () => {
   test('should error no listener', async () => {
 
     await expect(wsrClient20?.request('no_listener', 1, 'client10')).rejects
-      .toMatchObject({ code: 'ERR_WSR_NO_LISTENER' })
+      .toMatchObject({ code: 'ERR_WSR_NO_RESPONSE' })
   })
 
-  test.skip('should error no destination', async () => {
-
-    // #FIX need to fix and throw error when no destination.
-    // currently only triggers timeout error, which is bad.
+  test('should error no destination', async () => {
 
     wsrClient10?.on('foo', data => {
       expect(data).toBe('bar')
@@ -159,7 +151,7 @@ describe('RedisCluster', () => {
     })
 
     await expect(wsrClient20?.request('foo', 'bar', 'clientXX')).rejects
-      .toMatchObject({ code: 'ERR_WSR_NO_DESTINATION' })
+      .toMatchObject({ code: 'ERR_WSR_NO_RESPONSE' })
   })
 
   test('should request from redis client to user client', async () => {
@@ -402,6 +394,14 @@ describe('RedisCluster', () => {
     expect(client.redisOptions.port).toBe(options.port)
     expect(client.redisOptions.retry_strategy).toBe(options.retry_strategy)
     client.destroy()
+  })
+
+  test('should empty requests', async () => {
+
+    expect(wsrCC1?.requests.size).toBe(0)
+    expect(wsrCC2?.requests.size).toBe(0)
+    expect(wsrCC3?.requests.size).toBe(0)
+    expect(wsrCC4?.requests.size).toBe(0)
   })
 
 })

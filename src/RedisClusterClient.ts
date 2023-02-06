@@ -10,10 +10,12 @@ import {
 const rxSpace = / /ig
 
 export interface RedisClusterClientOptions {
-  host: string
-  client: any
-  id: string
-  timeout: number
+  host?: string
+  username?: string
+  password?: string
+  client?: any
+  id?: string
+  timeout?: number
   debug?: boolean
 }
 
@@ -34,7 +36,7 @@ export default class RedisClusterClient extends EventEmitter {
   private _id: string
 
   constructor(
-    options?: Partial<RedisClusterClientOptions>) {
+    options?: RedisClusterClientOptions) {
 
     super()
     options = options || {}
@@ -44,10 +46,12 @@ export default class RedisClusterClient extends EventEmitter {
     this._id = options.id
     this._options = options as RedisClusterClientOptions
 
-    const parts = this._options.host.split(':')
-    this._publisher = options?.client || createClient({
+    const parts = options.host.split(':')
+    this._publisher = options.client || createClient({
       host: parts[0],
       port: parts[1] && parseInt(parts[1], 10),
+      user: options.username || 'default',
+      password: options.password || '',
       retry_strategy: (r: any) => Math.min(r.attempt * 100, 3000)
     })
     this._subscriber = createClient(this._publisher.options)
@@ -69,6 +73,7 @@ export default class RedisClusterClient extends EventEmitter {
     this._publisher.on('connect', () => this.emit('connect'))
     this._publisher.on('error', () => this.emit('error'))
     this._publisher.on('end', () => this.emit('end'))
+    this.setId(this._id)
   }
 
   get options() {
@@ -128,7 +133,7 @@ export default class RedisClusterClient extends EventEmitter {
   async clientIds() {
     const clients = await this.clients()
     if (!clients) return []
-    return clients.map(c => c.name.split(':')[1])
+    return clients.map<string>(c => c.name.split(':')[1])
   }
 
   sendRequest(

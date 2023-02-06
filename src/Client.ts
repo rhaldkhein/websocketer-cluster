@@ -11,6 +11,7 @@ export default class Client extends ClientBase<any, any, RedisCluster> {
     options?: Partial<Options>) {
 
     super(undefined, options)
+    // override redis cluster id
     if (this._cluster) this._cluster.cluster.setId(this._options.id)
   }
 
